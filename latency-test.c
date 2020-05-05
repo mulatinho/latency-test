@@ -137,20 +137,12 @@ static double kafka_latency(char *server_host, int port)
 {
 	rd_kafka_t *rk;
 	rd_kafka_conf_t *conf;
-        rd_kafka_topic_t *topic_ctx;
-        rd_kafka_topic_conf_t *topic_conf;
-        rd_kafka_queue_t *rkqu = NULL;
+        rd_kafka_topic_partition_list_t *subscription;
 	struct timespec t1, t2, t3;
-	int running = 1;
         double result = 0;
-	char broker[254], errstr[128];
-
-	snprintf(broker, sizeof(broker)-1, "%s:%d", server_host, port);
-
-	// if (gethostname(server_host, strlen(server_host))) {
-	//	 fprintf(stderr, "%% Failed to lookup hostname\n");
-	//	 exit(2);
-	// }
+	char broker[512], errstr[512];
+        const char *topic_name = "latency";
+        int running = 1;
 
 	clock_gettime(CLOCK_REALTIME, &t1);
 
@@ -168,20 +160,12 @@ static double kafka_latency(char *server_host, int port)
 	}
 #endif
 
+	snprintf(broker, sizeof(broker)-1, "%s:%d", server_host, port);
 	if (rd_kafka_conf_set(conf, "bootstrap.servers", broker,
 		errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
 		goto config_failed;
 	}
 
-	if (rd_kafka_conf_set(conf, "acks", "1",
-	        errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
-		goto config_failed;
-	}
-
-	if (rd_kafka_conf_set(conf, "enable.partition.eof", "true",
-	        errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
-		goto config_failed;
-	}
 
 	if (rd_kafka_conf_set(conf, "group.id", "latency",
 	        errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
@@ -193,57 +177,50 @@ static double kafka_latency(char *server_host, int port)
 		goto config_failed;
 	}
 
-	
-        if (rd_kafka_brokers_add(rk, broker) < 1) {
-		fprintf(stderr, ":. No valid brokers\n");
-		goto config_failed;
-	}
+        conf = NULL;
 
-        topic_conf = rd_kafka_topic_conf_new();
-        topic_ctx = rd_kafka_topic_new(rk, "latency", topic_conf);
+        rd_kafka_poll_set_consumer(rk);
+
+        subscription = rd_kafka_topic_partition_list_new(1);
+        rd_kafka_topic_partition_list_add(subscription, topic_name, RD_KAFKA_PARTITION_UA);
 	
-        rd_kafka_consume_start(topic_ctx, RD_KAFKA_PARTITION_UA, RD_KAFKA_OFFSET_BEGINNING);
-	
+        if (rd_kafka_subscribe(rk, subscription) != RD_KAFKA_RESP_ERR_NO_ERROR) {
+                fprintf(stderr, ":. failed to subscribe on topic\n");
+                goto config_failed;
+        }
+
+        rd_kafka_topic_partition_list_destroy(subscription);
+
         clock_gettime(CLOCK_REALTIME, &t2);
 	latency_measure("kafka->connection", t1, t2);
 
 	while (running) {
-		rd_kafka_message_t *rkmessage = rd_kafka_consume(topic_ctx, RD_KAFKA_PARTITION_UA, 500);
+		rd_kafka_message_t *rkmessage = rd_kafka_consumer_poll(rk, 100);
 		if (rkmessage) {
-			fprintf(stdout, "%p %p\n", rkmessage, rkmessage->err);
-			if (!rkmessage->err) {
-				fprintf(stdout, ":. Message fetched on topic %s, metadata:(offset %ld, %zd bytes):\n",
-					rd_kafka_topic_name(rkmessage->rkt), rkmessage->offset, rkmessage->len);
+#ifdef DEBUG
+			fprintf(stdout, ":. Message fetched on topic %s, metadata:(offset %ld, %zd bytes):\n",
+				rd_kafka_topic_name(rkmessage->rkt), rkmessage->offset, rkmessage->len);
+#endif
+			
+                        clock_gettime(CLOCK_REALTIME, &t3);
+			latency_measure("kafka->fetch_topic", t1, t3);
 
-				clock_gettime(CLOCK_REALTIME, &t3);
-				latency_measure("kafka->fetch_topic", t1, t3);
-				rd_kafka_message_destroy(rkmessage);
-
-			} else {
-				fprintf(stderr, ":. err: %s\n", rd_kafka_err2str(rkmessage->err));
-			}
-
+                        rd_kafka_message_destroy(rkmessage);
+                        running--;
                 }
-		
-                fprintf(stdout, ":. looping...\n");
-                //running--;
-                sleep(2);
 	}
 
 	result = latency_measure("kafka->total", t1, t3);
 	goto exit_nicely;
 
 config_failed:
-	fprintf(stderr, "%% %s\n", errstr);
-	rd_kafka_conf_destroy(conf);
-	rd_kafka_conf_destroy(conf);
+	fprintf(stderr, ":. critical error: %s\n", errstr);
+	rd_kafka_destroy(rk);
 
 	exit(2);
 
 exit_nicely:
 	rd_kafka_destroy(rk);
-	return 0;
-
         return result;
 }
 
