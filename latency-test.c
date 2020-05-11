@@ -141,7 +141,7 @@ static double kafka_latency(char *server_host, int port)
 	struct timespec t1, t2, t3;
         double result = 0;
 	char broker[512], errstr[512];
-        const char *topic_name = "latency";
+        char *topic_name;;
         int running = 1;
 
 	clock_gettime(CLOCK_REALTIME, &t1);
@@ -182,6 +182,12 @@ static double kafka_latency(char *server_host, int port)
         rd_kafka_poll_set_consumer(rk);
 
         subscription = rd_kafka_topic_partition_list_new(1);
+
+        if (!(topic_name = getenv("KAFKATOPIC"))) {
+		fprintf(stderr, ":. You need to set KAFKATOPIC environment variable\n");
+		goto config_failed;
+        }
+
         rd_kafka_topic_partition_list_add(subscription, topic_name, RD_KAFKA_PARTITION_UA);
 	
         if (rd_kafka_subscribe(rk, subscription) != RD_KAFKA_RESP_ERR_NO_ERROR) {
