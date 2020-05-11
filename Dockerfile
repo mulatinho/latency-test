@@ -5,10 +5,10 @@ WORKDIR /opt/app
 RUN apt-get update -y && \
 	apt-get install curl librdkafka-dev libpq-dev libhiredis-dev gcc default-jre -y
 
-RUN curl -O http://mirror.nbtelecom.com.br/apache/kafka/2.5.0/kafka_2.12-2.5.0.tgz && \
-	tar xfz kafka_2.12-2.5.0.tgz -C /opt/app/
+RUN curl -O https://archive.apache.org/dist/kafka/2.0.1/kafka_2.12-2.0.1.tgz && \
+	tar xfz kafka_2.12-2.0.1.tgz -C /opt/app/
 
-ENV PATH=$PATH:/opt/app/kafka_2.12-2.5.0/bin
+ENV PATH=$PATH:/opt/app/kafka_2.12-2.0.1/bin
 
 COPY latency-test.* /opt/app/
 
