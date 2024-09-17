@@ -16,37 +16,19 @@
  *
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "latency-test.h"
 
-#include <librdkafka/rdkafka.h>
-#include <libpq-fe.h>
-#include <hiredis.h>
-
-#define RETRY 10
-static double measures[RETRY] = {0};
-
-static double latency_measure(char *name, struct timespec start, struct timespec finish)
+double latency_measure(char *name, struct timespec start, struct timespec finish)
 {
 	long seconds = finish.tv_sec - start.tv_sec;
 	long ns = finish.tv_nsec - start.tv_nsec;
-        char result_str[128];
         double result;
 
 	if (start.tv_nsec > finish.tv_nsec) { --seconds; ns += 1000000000; }
         result = (double)ns/(double)1000000;
 	fprintf(stdout, ":. [%s] milliseconds: %fms\n", name, result);
 
-        return result;
+    return result;
 }
 
 char *get_ip(char *hostname)
@@ -63,11 +45,10 @@ char *get_ip(char *hostname)
         return NULL;
 }
 
-static double postgresql_latency(char *server_host, int port)
+double postgresql_latency(char *server_host, int port)
 {
 	char conninfo[256];
 	PGconn *conn;
-	PGresult *res;
 	struct timespec t1, t2, t3;
         double result = 0.0;
 
@@ -103,7 +84,7 @@ static double postgresql_latency(char *server_host, int port)
         return result;
 }
 
-static double redis_latency(char *server_host, int port)
+double redis_latency(char *server_host, int port)
 {
 	redisContext *redis_ctx;
 	redisReply *reply;
@@ -133,7 +114,7 @@ static double redis_latency(char *server_host, int port)
         return result;
 }
 
-static double kafka_latency(char *server_host, int port)
+double kafka_latency(char *server_host, int port)
 {
 	rd_kafka_t *rk;
 	rd_kafka_conf_t *conf;
@@ -230,13 +211,13 @@ exit_nicely:
         return result;
 }
 
-static void warn_error_and_quit()
+void warn_error_and_quit()
 {
 	fprintf(stderr, "usage: ./latency-test <kafka|redis|postgresql> 127.0.0.1 31200\n");
 	exit(1);
 }
 
-static int handle_measure(char *type, char *hostname, int port)
+int handle_measure(char *type, char *hostname, int port)
 {
 	int i = 0;
         double sum = 0.0, result = 0.0;
@@ -264,21 +245,6 @@ static int handle_measure(char *type, char *hostname, int port)
 
         result = sum / RETRY;
         fprintf(stdout, ":. [%s] latency in average is: %fms (%d tests were executed)\n", type, result, RETRY);
-
-	return 0;
-}
-
-int main(int argc, char **argv)
-{
-	struct hostent *host;
-	char hostname[128];
-	int port = 0;
-
-	if (argc < 3) { warn_error_and_quit(); }
-
-	port = atoi(argv[3]);
-
-	handle_measure(argv[1], argv[2], port);
 
 	return 0;
 }

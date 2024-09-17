@@ -5,12 +5,12 @@
 #
 # Init Script
 
-if [ ! -d "kafka_2.12-2.5.0" ] ; then
-        curl -O http://mirror.nbtelecom.com.br/apache/kafka/2.5.0/kafka_2.12-2.5.0.tgz && \
-	        tar xfz kafka_2.12-2.5.0.tgz -C . && rm -fv kafka_2.12-2.5.0.tgz
+if [ ! -d "kafka_2.12-2.0.1" ] ; then
+        curl -O https://archive.apache.org/dist/kafka/2.0.1/kafka_2.12-2.0.1.tgz && \
+                tar xfz kafka_2.12-2.0.1.tgz -C . && rm -fv kafka_2.12-2.0.1.tgz
 fi
 
-export PATH=$PATH:./kafka_2.12-2.5.0/bin
+export PATH=$PATH:./kafka_2.12-2.0.1/bin
 
 KAFKAENABLE=$KAFKAENABLE
 POSTGRESENABLE=$POSTGRESENABLE
@@ -44,19 +44,19 @@ if [ $KAFKAENABLE -eq 1 ] ; then
         echo :. measuring kafka...
 
         # 01. Create a Topic
-        KAFKATOPIC=latency
-        kafka-topics.sh --create --topic $KAFKATOPIC \
-                --zookeeper $ZOOKEEPERHOST:$ZOOKEEPERPORT --replication-factor 2 --partitions 2
-        sleep 2
+        #KAFKATOPIC=latency
+        #kafka-topics.sh --create --topic $KAFKATOPIC \
+        #        --zookeeper $ZOOKEEPERHOST:$ZOOKEEPERPORT --replication-factor 2 --partitions 2
+        #sleep 2
         # 02. Create some messages
-        echo :. Producing one message
-        printf "%0.sA" {1..1000} | kafka-console-producer.sh --broker-list $KAFKAHOST:$KAFKAPORT --topic $KAFKATOPIC --property group.id=latency
+        #echo :. Producing one message
+        #printf "%0.sA" {1..1000} | kafka-console-producer.sh --broker-list $KAFKAHOST:$KAFKAPORT --topic $KAFKATOPIC --property group.id=latency
 
         # 03. Now we can measure...
         ./latency-test kafka $KAFKAHOST $KAFKAPORT
 
         # 04. Drop the test topic
-        kafka-topics.sh --delete --topic $KAFKATOPIC --zookeeper $ZOOKEEPERHOST:$ZOOKEEPERPORT
+        #kafka-topics.sh --delete --topic $KAFKATOPIC --zookeeper $ZOOKEEPERHOST:$ZOOKEEPERPORT
 fi
 
 if [ $POSTGRESENABLE -eq 1 ] ; then
