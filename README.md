@@ -25,8 +25,7 @@ Ensure you have the following dependencies installed:
 ```sh
 git clone https://github.com/mulatinho/latency-test.git
 cd latency-test
-make &&  make install
-gcc -o latency-test latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis
+make && make install
 ```
 
 ## Usage
@@ -97,7 +96,7 @@ Contributions are welcome! Please follow these steps:
 5. Open a pull request
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 For questions or suggestions, feel free to reach out via GitHub issues.
