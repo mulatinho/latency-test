@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+latency-configmap
+data:
+  POSTGRESENABLE: 1
+  REDISENABLE: 1
+  PGHOST: "postgres"
+  PGUSER: "postgres"
+  PGPASS: "change-this"
