@@ -1,0 +1,26 @@
+name: build
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: [ "ubuntu-latest" ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: coursier/cache-action@v6.4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - name: publish in docker hub
+        run: |-
+          echo "$TOKEN" | docker login -u mulatinho --password-stdin
+          docker build -t mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER .
+          docker tag mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER mulatinho/latency-test:latest
+          docker push mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER
+          docker push mulatinho/latency-test:latest
+        env:
+          TOKEN: ${{ secrets.PAT_DOCKER }}
