@@ -28,7 +28,7 @@ jobs:
         run: |-
           echo "$TOKEN" | gh auth login --with-token
           docker pull mulatinho/latency-test:$VERSION
-          #gh release create "$VERSION" --generate-notes './src/latency-test#Linux 64bit binary'
+          gh release create "$VERSION" --generate-notes './src/latency-test#Linux 64bit binary'
         env:
           TOKEN: ${{ secrets.PAT_GITHUB }}
           VERSION: ${{ inputs.version }}
