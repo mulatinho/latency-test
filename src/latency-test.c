@@ -9,7 +9,7 @@
  * $ gcc -o latency-test latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis
  *
  * usage:
- * $ export POSTGRES_USER=postgres POSTGRES_PASSWORD=password KAFKATOPIC=latency KAFKAGROUP=latency\n");
+ * $ export POSTGRES_USER=postgres POSTGRES_PASSWORD=password KAFKA_TOPIC=latency KAFKA_GROUP=latency\n");
  * $ ./latency-test postgresql 127.0.0.1 5432
  * $ ./latency-test kafka 127.0.0.1 9092
  * $ ./latency-test redis 127.0.0.1 6379
@@ -20,7 +20,18 @@
 
 void latency_warn_error_and_quit(void)
 {
-	fprintf(stderr, "usage: ./latency-test <kafka|redis|postgresql> 127.0.0.1 31200\n");
+	fprintf(stderr, 
+		"latency-test v%s\n\n"
+		"\t-s\trun the server version exposing metrics to prometheus\n"
+		"\t-h\tshow this help message\n\n"
+		"if you are using the '-s' argument it will need the envs below and more.:\n"
+		"- REDIS_ENABLED: enable measure in redis-server\n"
+		"- POSTGRES_ENABLED: enable measure in postgresql server\n"
+		"- KAFKA_ENABLED: enable measure in kafka server\n\n"
+		"usage: ./latency-test [-s] <kafka|redis|postgresql> 127.0.0.1 31200\n",
+		LATENCY_VERSION
+	);
+
 	exit(1);
 }
 
@@ -76,7 +87,7 @@ double latency_collect_postgresql(char *server_host, int port)
 	conn = PQconnectdb(conninfo);
 	if (PQstatus(conn) != CONNECTION_OK)
 	{
-		fprintf(stderr, ":. connection string: %s\n:. connection refused while trying to connect into %s...", conninfo, server_host);
+		fprintf(stderr, ":. connection string: %s\n:. connection refused while trying to connect into %s...\n", conninfo, server_host);
 		PQfinish(conn);
 		exit(-1);
 	}
@@ -108,7 +119,7 @@ double latency_collect_redis(char *server_host, int port)
 
 	if (redis_ctx != NULL && redis_ctx->err)
 	{
-		fprintf(stderr, ":. connection refused while trying to connect into %s...", server_host);
+		fprintf(stderr, ":. connection refused while trying to connect into %s...\n", server_host);
 		exit(-1);
 	}
 
@@ -135,8 +146,10 @@ double latency_collect_kafka(char *server_host, int port)
 	double result = 0;
 	char broker[NAME_MAX], errstr[NAME_MAX];
 	char *topic_name;
-	;
 	int running = 1;
+	
+	char *env_topic = getenv("KAFKA_TOPIC");
+	char *env_zookeeper = getenv("KAFKA_ZOOKEEPER_HOST");
 
 	clock_gettime(CLOCK_REALTIME, &t1);
 
@@ -173,9 +186,9 @@ double latency_collect_kafka(char *server_host, int port)
 
 	subscription = rd_kafka_topic_partition_list_new(1);
 
-	if (!(topic_name = getenv("KAFKATOPIC")))
+	if (!(topic_name = env_topic))
 	{
-		fprintf(stderr, ":. You need to set KAFKATOPIC environment variable\n");
+		fprintf(stderr, ":. You need to set KAFKA_TOPIC environment variable\n");
 		goto config_failed;
 	}
 
@@ -227,67 +240,71 @@ int latency_collect_metric(char *type, char *hostname, int port, double latency)
 	return 0;
 }
 
-int latency_update_metrics(void)
+int latency_update_metrics(char *recv_buffer)
 {
-	char *svc_enabled[] = { "REDISENABLE", "KAFKAENABLE", "POSTGRESENABLE" };
-	char *env_list[][] = {
+	char env_list[3][2][NAME_MAX] = {
 		{ "REDIS_HOST", "REDIS_PORT" },
-		{ "KAFKA_HOST", "KAFKA_PORT", "ZOOKEEPER_HOST", "KAFKA_TOPIC" },
-		{ "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD" },
+		{ "KAFKA_HOST", "KAFKA_PORT" },
+		{ "POSTGRES_HOST", "POSTGRES_PORT" },
 	};
-	char buffer[BUFFER_SIZE] = {0};
+	char *svc_enabled[] = { "REDIS_ENABLED", "KAFKA_ENABLED", "POSTGRES_ENABLED" };
 	int svc_enabled_size = sizeof(svc_enabled) / sizeof(svc_enabled[0]);
+	char buffer[BUFFER_SIZE_MIN] = {0};
 
+	BUFFER_ZERO(recv_buffer);
 	snprintf(buffer, sizeof(buffer) - 1,
 		"# HELP latency_test_total_measures Total of connections initiated from latency test\n"
 		"# TYPE latency_test_total_measures counter\n");
+	strcat(recv_buffer, buffer);
 
 	for (int svc_loop = 0; svc_loop < svc_enabled_size; svc_loop++) {
 		char *env = getenv(svc_enabled[svc_loop]);
-		char *host = NULL, *port = NULL;
+		char *host = NULL;
+		int port = 0;
 
+		LATENCY_DEBUG("THISLOOP")
 		if (!strncmp(env, "true", 4)) {
+			char service[NAME_MAX] = {0};
 			double miliseconds = 0;
-			env_list_size = sizeof(env_list[svc_loop]) / sizeof(env_list[svc_loop][0]);
+			host = getenv(env_list[svc_loop][0]);
+			port = atoi(getenv(env_list[svc_loop][1]));
 
+		LATENCY_DEBUG("THISLOOP")
 			switch(svc_loop) {
 			case LATENCY_SERVICE_REDIS:
-				miliseconds = latency_collect("redis", host, port);
-
-				snprintf(buffer, sizeof(buffer) - 1,
-				 	"%s\nlatency_test_measure_miliseconds{service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-				 	buffer, "redis", host, port, miliseconds);
+				sprintf(service, "redis");
+				miliseconds = latency_collect(service, host, (int)port);
 				break;
 			case LATENCY_SERVICE_KAFKA:
-				latency_collect("kafka", host, port);
-				snprintf(buffer, sizeof(buffer) - 1,
-				 	"%s\nlatency_test_measure_miliseconds{service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-				 	buffer, "kafka", host, port, miliseconds);
+				sprintf(service, "kafka");
+				miliseconds = latency_collect(service, host, port);
 				break;
 			case LATENCY_SERVICE_POSTGRES:
-				latency_collect("postgres", host, port);
-				snprintf(buffer, sizeof(buffer) - 1,
-				 	"%s\nlatency_test_measure_miliseconds{service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-				 	buffer, "postgres", host, port, miliseconds);
+				sprintf(service, "postgres");
+				miliseconds = latency_collect(service, host, port);
+				break;
+			default:
 				break;
 			}
+		LATENCY_DEBUG("THISLOOP")
+			snprintf(buffer, sizeof(buffer) - 1,
+				"latency_test_measure_miliseconds{service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
+				service, host, port, miliseconds);
+			strcat(recv_buffer, buffer);
 		}
-		// snprintf(buffer, sizeof(buffer) - 1,
-		// 	"%s\nlatency_test_total_measures{container=\"latency-test\",service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-		// 	buffer, type, hostname, port, latency);
 	}
 
-	snprintf(buffer, sizeof(buffer) - 1,
-		"%s\n# HELP latency_test_measure_miliseconds The latency average in miliseconds\n"
-		"# TYPE latency_test_measure_miliseconds gauge\n", buffer);
+	// snprintf(buffer, sizeof(buffer) - 1,
+	// 	"%s\n# HELP latency_test_measure_miliseconds The latency average in miliseconds\n"
+	// 	"# TYPE latency_test_measure_miliseconds gauge\n", buffer);
 
-	for (int svc_loop = 0; svc_loop < svc_enabled_size; svc_loop++) {
-		// snprintf(buffer, sizeof(buffer) - 1,
-		// 	"%s\nlatency_test_measure_miliseconds{container=\"latency-test\",service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-		// 	type, hostname, port, latency);
-	}
+	// for (int svc_loop = 0; svc_loop < svc_enabled_size; svc_loop++) {
+	// 	// snprintf(buffer, sizeof(buffer) - 1,
+	// 	// 	"%s\nlatency_test_measure_miliseconds{container=\"latency-test\",service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
+	// 	// 	type, hostname, port, latency);
+	// }
 
-	return 0;
+	return 0; 
 }
 
 int latency_collect(char *type, char *hostname, int port)
@@ -297,6 +314,7 @@ int latency_collect(char *type, char *hostname, int port)
 	double (*func)(char *, int);
 	char *ipaddr = NULL;
 
+	LATENCY_DEBUG("HEHEHE")
 	if (!strncmp(type, "kafka", 5))
 		func = latency_collect_kafka;
 	else if (!strncmp(type, "redis", 5))
@@ -328,7 +346,9 @@ int latency_start_server(void)
 	int server_fd, new_connection;
 	struct sockaddr_in address;
 	socklen_t addrlen = sizeof(address);
-	char buffer[BUFFER_SIZE] = {0};
+	char content[BUFFER_SIZE_MIN] = {0}, cache[BUFFER_SIZE_MIN] = {0};
+	struct timespec finish, start;
+	int loop = 0;
 
 	server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == 0)
@@ -348,6 +368,11 @@ int latency_start_server(void)
 
 	while (1)
 	{
+		char buffer[BUFFER_SIZE_MAX] = {0};
+		int seconds = 0;
+
+		clock_gettime(CLOCK_REALTIME, &start);
+
 		new_connection = accept(server_fd, (struct sockaddr *)&address, &addrlen);
 		if (new_connection < 0)
 		{
@@ -355,18 +380,31 @@ int latency_start_server(void)
 			continue;
 		}
 
-		// TODO GET CONTENT
+		clock_gettime(CLOCK_REALTIME, &finish);
+		seconds = finish.tv_sec - start.tv_sec;
 
-		// snprintf(buffer, sizeof(buffer),
-		// 			"HTTP/1.1 200 OK\r\n"
-		// 			"Content-Type: text/plain\r\n"
-		// 			"Content-Length: %lu\r\n\r\n%s",
-		// 			strlen(content), content);
+		if (!strlen(cache) || !(loop %10)) {
+			clock_gettime(CLOCK_REALTIME, &finish);
+			seconds = finish.tv_sec - start.tv_sec;
+
+			latency_update_metrics(cache);
+			fprintf(stdout, "HO ===> %s\n", cache);
+		}
+		sprintf(content, cache);
+
+		snprintf(buffer, sizeof(buffer),
+					"HTTP/1.1 200 OK\r\n"
+					"Content-Type: text/plain\r\n"
+					"Content-Length: %lu\r\n\r\n%s",
+					strlen(content), content);
+
+		fprintf(stdout, buffer);
 
 		send(new_connection, buffer, strlen(buffer), 0);
 		close(new_connection);
 
 		usleep(850);
+		loop++;
 	}
 
 	return 0;
@@ -376,22 +414,18 @@ int main(int argc, char **argv)
 {
 	int port = 0, opt = 0;
 
-	if (argc < 3)
-		latency_warn_error_and_quit();
-
-	opt = getopt(argc, argv, "ghnuv");
+	opt = getopt(argc, argv, "hs");
 	switch (opt)
 	{
 	case 'h':
 		latency_warn_error_and_quit();
 		break;
-	case 'v':
-		fprintf(stdout, LATENCY_VERSION);
-		break;
 	case 's':
 		latency_start_server();
 		break;
 	default:
+		if (argc < 3)
+			latency_warn_error_and_quit();
 		break;
 	}
 
