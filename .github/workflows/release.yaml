@@ -24,13 +24,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker
-      - name: publish in docker hub
+      - name: generate a release in github
         run: |-
           echo "$TOKEN" | gh auth login --with-token
 
           docker pull mulatinho/latency-test:$VERSION
-          docker run -d --name sfm mulatinho/latency-test sleep 5
-          docker cp sfm:/app/latency-rest ./latency-test
+          docker run -d --name latency mulatinho/latency-test sleep 5
+          docker cp latency:/app/latency-rest ./latency-test
 
           gh release create "$VERSION" --generate-notes './latency-test#Linux 64bit binary'
         env:
