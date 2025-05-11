@@ -1,5 +1,9 @@
 # Latency Test
 
+[![License](https://img.shields.io/badge/license-GPLv2-blue.svg)](LICENSE)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](README.md#Contributing)
+![GH Action Build Status](https://github.com/mulatinho/latency-test/actions/workflows/build.yaml/badge.svg)
+
 A simple tool to measure network latency and response times.
 
 ## Features
@@ -34,15 +38,15 @@ make && make install
 ```sh
 ./check-latency [postgresql|redis|kafka] <host> <port>
 
-export PGUSER=youruser
-export PGPASS=y0urpass
+export POSTGRES_USER=youruser
+export POSTGRES_PASS=y0urpass
 ./check-latency postgresql 127.0.0.1 5432
 ```
 
 ### Example Output
 
 ```sh
-$ PGUSER=yourus3r PGPASS=p4ssword ./check-latency postgresql 127.0.0.1 5432
+$ POSTGRES_USER=yourus3r PGPASS=p4ssword ./check-latency postgresql 127.0.0.1 5432
 :. [postgres->connection] milliseconds: 29.197785ms
 :. [postgres->response] milliseconds: 20.253507ms
 :. [postgres->total] milliseconds: 49.451292ms
