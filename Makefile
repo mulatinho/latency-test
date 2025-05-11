@@ -1,24 +1,27 @@
-all: check-latency
+all: latency-test
+
+#TODO deb:
 
 deb-deps:
 	sudo apt-get install librdkafka-dev libpq-dev libhiredis-dev gcc -y
 
 clean:
-	rm -fv src/*~ src/*.o src/*.swp src/latency-test src/check-latency
+	rm -fv src/*~ src/*.o src/*.swp src/latency-test
 	rm -fv tests/*~ tests/*.o tests/*.swp tests/unit-tests
 
 image:
 	docker build -t latency-test:latest .
 
-latency-test:
-	gcc -Wall -c -o src/latency-test.o src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
+push-image:
+	docker push mulatinho/latency-test:latest
 
-check-latency: latency-test
-	gcc -Wall -c -o src/check-latency.o src/check-latency.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
-	gcc -Wall -o src/check-latency src/check-latency.o src/latency-test.o -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis
+latency-test:
+	gcc -Wall -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis
 
 latency-test-debug:
-	gcc -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
+	gcc -DDEBUG=1 -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
 
 install:
 	install -m 0755 src/check-latency /usr/local/bin/check-latency
+	install -m 0644 doc/latency-test.1 /usr/local/share/man/man1/latency-test.1
+

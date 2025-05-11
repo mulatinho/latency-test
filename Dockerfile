@@ -1,4 +1,4 @@
-FROM debian:bookworm
+FROM debian:bookworm-slim
 ENV PATH=$PATH:/opt/app/kafka_2.12-2.0.1/bin
 
 WORKDIR /app
@@ -12,7 +12,9 @@ RUN make
 
 FROM debian:bookworm-slim 
 WORKDIR /app
-COPY --from=0 /app/src/check-latency /app/
-COPY --from=0 /app/src/latency-test.sh /app/
 
-CMD [ "/app/latency-test.sh" ]
+EXPOSE 8080
+
+COPY --from=0 /app/src/latency-test /app/latency-test
+
+CMD [ "/app/latency-test", "-s" ]
