@@ -5,6 +5,7 @@ metadata:
   name: latency-test
   labels:
     app: latency-test
+    namespace: default
 spec:
   replicas: 1
   selector:
@@ -24,22 +25,11 @@ spec:
         command: ["/bin/sh"]
         args: ["-c", "while true; do ./latency-test.sh; sleep 10; done"]
         env:
-        - name: POSTGRESENABLE
-          value: "1"
-        - name: REDISENABLE
-          value: "1"
-        - name: PGHOST
-          value: "postgres"
-        - name: PGUSER
-          value: "postgres"
         - name: PGPASS
           valueFrom:
             secretKeyRef:
               name: cloudsql-db-credentials
               key: password
-        - name: ZOOKEEPERHOST
-          value: "zookeper-1"
-        - name: KAFKAHOST
-          value: "kafka-1"
-        - name: REDISHOST
-          value: "redis"
+        envFrom:
+        - configMapRef:
+            name: latency-configmap
