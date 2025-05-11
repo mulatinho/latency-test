@@ -27,8 +27,12 @@ jobs:
       - name: publish in docker hub
         run: |-
           echo "$TOKEN" | gh auth login --with-token
+
           docker pull mulatinho/latency-test:$VERSION
-          gh release create "$VERSION" --generate-notes './src/latency-test#Linux 64bit binary'
+          docker run -d --name sfm mulatinho/latency-test sleep 5
+          docker cp sfm:/app/latency-rest ./latency-test
+
+          gh release create "$VERSION" --generate-notes './latency-test#Linux 64bit binary'
         env:
           TOKEN: ${{ secrets.PAT_GITHUB }}
           VERSION: ${{ inputs.version }}
