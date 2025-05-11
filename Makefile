@@ -19,7 +19,7 @@ latency-test:
 	gcc -Wall -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis
 
 latency-test-debug:
-	gcc -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
+	gcc -DDEBUG=1 -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
 
 install:
 	install -m 0755 src/check-latency /usr/local/bin/check-latency

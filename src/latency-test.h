@@ -66,7 +66,7 @@ double latency_collect_kafka(char *server_host, int port);
 double latency_collect_postgresql(char *server_host, int port);
 double latency_collect_redis(char *server_host, int port);
 int latency_collect_metric(char *type, char *hostname, int port, double latency);
-int latency_collect(char *type, char *hostname, int port);
+double latency_collect(char *type, char *hostname, int port);
 int latency_update_metrics(char *);
 int latency_start_server(void);
 void latency_warn_error_and_quit(void);

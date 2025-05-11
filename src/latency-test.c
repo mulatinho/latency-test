@@ -35,6 +35,68 @@ void latency_warn_error_and_quit(void)
 	exit(1);
 }
 
+int latency_service_get_service_type(char *type)
+{
+	if (!strncmp(type, "KAFKA", 5) || !strncmp(type, "kafka", 5))
+		return LATENCY_SERVICE_KAFKA;
+	else if (!strncmp(type, "REDIS", 5) || !strncmp(type, "redis", 5))
+		return LATENCY_SERVICE_REDIS;
+	else if (!strncmp(type, "POSTGRESQL", 10) || !strncmp(type, "postgresql", 10))
+		return LATENCY_SERVICE_POSTGRES;
+
+	return -1;
+}
+
+char *latency_service_get_name_by_type(int svc_type)
+{
+	char *service = NULL;
+
+	switch(svc_type) {
+	case LATENCY_SERVICE_REDIS:
+		service = strdup("REDIS");
+		break;
+	case LATENCY_SERVICE_KAFKA:
+		service = strdup("KAFKA");
+		break;
+	case LATENCY_SERVICE_POSTGRES:
+		service = strdup("POSTGRESQL");
+		break;
+	default:
+		break;
+	}
+
+	return (char *)service;
+}
+
+void latency_check_envs(char *service_name)
+{
+	char *host = NULL, *port = NULL;
+	char env_list[LATENCY_SERVICES_SIZE][2][NAME_MAX] = {
+		{ "REDIS_HOST", "REDIS_PORT" },
+		{ "KAFKA_HOST", "KAFKA_PORT" },
+		{ "POSTGRES_HOST", "POSTGRES_PORT" },
+	};
+	int service_type = -1, port_n = 0;
+
+	if ((service_type = latency_service_get_service_type(service_name)) == -1) {
+		fprintf(stderr, "no such service '%s'\n", service_name);
+		exit(1);
+	}
+
+	host = getenv(env_list[service_type][0]);
+	if (!host) {
+		fprintf(stderr, "%s_HOST is not set correctly, exiting...\n", service_name);
+		exit(1);
+	}
+
+	port = getenv(env_list[service_type][1]);
+	port_n = atoi(port);
+	if (!port_n) {
+		fprintf(stderr, "%s_PORT is not set correctly, exiting...\n", service_name);
+		exit(1);
+	}
+}
+
 double latency_calc(char *name, struct timespec start, struct timespec finish)
 {
 	long seconds = finish.tv_sec - start.tv_sec;
@@ -210,8 +272,8 @@ double latency_collect_kafka(char *server_host, int port)
 		rd_kafka_message_t *rkmessage = rd_kafka_consumer_poll(rk, 100);
 		if (rkmessage)
 		{
-			LATENCY_DEBUG(":. Message fetched on topic %s, metadata:(offset %ld, %zd bytes):\n",
-					rd_kafka_topic_name(rkmessage->rkt), rkmessage->offset, rkmessage->len);
+			// LATENCY_DEBUG(":. Message fetched on topic %s, metadata:(offset %ld, %zd bytes):\n",
+			// 		rd_kafka_topic_name(rkmessage->rkt), rkmessage->offset, rkmessage->len);
 
 			clock_gettime(CLOCK_REALTIME, &t3);
 			latency_calc("kafka->fetch_topic", t1, t3);
@@ -235,11 +297,6 @@ exit_nicely:
 	return result;
 }
 
-int latency_collect_metric(char *type, char *hostname, int port, double latency)
-{
-	return 0;
-}
-
 int latency_update_metrics(char *recv_buffer)
 {
 	char env_list[3][2][NAME_MAX] = {
@@ -259,67 +316,48 @@ int latency_update_metrics(char *recv_buffer)
 
 	for (int svc_loop = 0; svc_loop < svc_enabled_size; svc_loop++) {
 		char *env = getenv(svc_enabled[svc_loop]);
-		char *host = NULL;
-		int port = 0;
+		if (!env)
+			continue;
 
-		LATENCY_DEBUG("THISLOOP")
 		if (!strncmp(env, "true", 4)) {
-			char service[NAME_MAX] = {0};
+			char *service = NULL, *host = NULL, *port = NULL;
 			double miliseconds = 0;
-			host = getenv(env_list[svc_loop][0]);
-			port = atoi(getenv(env_list[svc_loop][1]));
+			int port_n = 0;
 
-		LATENCY_DEBUG("THISLOOP")
-			switch(svc_loop) {
-			case LATENCY_SERVICE_REDIS:
-				sprintf(service, "redis");
-				miliseconds = latency_collect(service, host, (int)port);
-				break;
-			case LATENCY_SERVICE_KAFKA:
-				sprintf(service, "kafka");
-				miliseconds = latency_collect(service, host, port);
-				break;
-			case LATENCY_SERVICE_POSTGRES:
-				sprintf(service, "postgres");
-				miliseconds = latency_collect(service, host, port);
-				break;
-			default:
-				break;
-			}
-		LATENCY_DEBUG("THISLOOP")
+			service = latency_service_get_name_by_type(svc_loop);
+			latency_check_envs(service);
+
+			host = getenv(env_list[svc_loop][0]);
+			port = getenv(env_list[svc_loop][1]);
+
+			port_n = atoi(port);
+			miliseconds = latency_collect(service, host, port_n);
+
+			BUFFER_ZERO(buffer);
 			snprintf(buffer, sizeof(buffer) - 1,
+				"# HELP latency_test_measure_miliseconds The latency average in miliseconds\n"
+				"# TYPE latency_test_measure_miliseconds gauge\n"
 				"latency_test_measure_miliseconds{service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-				service, host, port, miliseconds);
+				service, host, port_n, miliseconds);
 			strcat(recv_buffer, buffer);
 		}
 	}
 
-	// snprintf(buffer, sizeof(buffer) - 1,
-	// 	"%s\n# HELP latency_test_measure_miliseconds The latency average in miliseconds\n"
-	// 	"# TYPE latency_test_measure_miliseconds gauge\n", buffer);
-
-	// for (int svc_loop = 0; svc_loop < svc_enabled_size; svc_loop++) {
-	// 	// snprintf(buffer, sizeof(buffer) - 1,
-	// 	// 	"%s\nlatency_test_measure_miliseconds{container=\"latency-test\",service=\"%s\",hostname=\"%s\",port=\"%d\"} %f\n",
-	// 	// 	type, hostname, port, latency);
-	// }
-
 	return 0; 
 }
 
-int latency_collect(char *type, char *hostname, int port)
+double latency_collect(char *type, char *hostname, int port)
 {
 	int i = 0;
 	double sum = 0.0, result = 0.0;
 	double (*func)(char *, int);
 	char *ipaddr = NULL;
 
-	LATENCY_DEBUG("HEHEHE")
-	if (!strncmp(type, "kafka", 5))
+	if (!strncmp(type, "KAFKA", 5) || !strncmp(type, "kafka", 5))
 		func = latency_collect_kafka;
-	else if (!strncmp(type, "redis", 5))
+	else if (!strncmp(type, "REDIS", 5) || !strncmp(type, "redis", 5))
 		func = latency_collect_redis;
-	else if (!strncmp(type, "postgresql", 10))
+	else if (!strncmp(type, "POSTGRESQL", 10) || !strncmp(type, "postgresql", 10))
 		func = latency_collect_postgresql;
 	else latency_warn_error_and_quit();
 
@@ -338,7 +376,7 @@ int latency_collect(char *type, char *hostname, int port)
 	result = sum / QUANTITY;
 	fprintf(stdout, ":. [%s] latency in average is: %fms (%d tests were executed)\n", type, result, QUANTITY);
 
-	return 0;
+	return result;
 }
 
 int latency_start_server(void)
@@ -388,7 +426,6 @@ int latency_start_server(void)
 			seconds = finish.tv_sec - start.tv_sec;
 
 			latency_update_metrics(cache);
-			fprintf(stdout, "HO ===> %s\n", cache);
 		}
 		sprintf(content, cache);
 
