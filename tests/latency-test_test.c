@@ -24,8 +24,11 @@ void unit_test_get_ip(void)
 
 	for (int battery = 0; battery < battery_size; battery++) {
 		char *result = latency_host_to_ip(battery_test[battery][BATTERY_INPUT]);
+		mlt_assert(result != NULL);
 		mlt_streq(result, battery_test[battery][BATTERY_OUTPUT]);
 	}
+
+	mlt_assert(latency_host_to_ip("sdadi.dwsf") == NULL);
 }
 
 int main(void)

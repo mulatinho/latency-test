@@ -1,4 +1,4 @@
-all: latency-test
+all: latency-test test
 
 #TODO deb:
 
@@ -22,9 +22,9 @@ latency-test-debug:
 	gcc -DDEBUG=1 -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
 
 test:
-	gcc -DMLT_TESTING=1 -Wall -o src/latency-test.o -c src/latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
-	gcc -DMLT_TESTING=1 -Wall -o tests/latency-test_test.o -c tests/latency-test_test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
-	gcc -DMLT_TESTING=1 -Wall -o tests/latency-test_test src/latency-test.o tests/latency-test_test.o -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I./tests/mlt
+	gcc -DMLT_TESTING=1 -Wall -g -ggdb -o src/latency-test.o -c src/latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
+	gcc -DMLT_TESTING=1 -Wall -g -ggdb -o tests/latency-test_test.o -c tests/latency-test_test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
+	gcc -DMLT_TESTING=1 -Wall -g -ggdb -o tests/latency-test_test src/latency-test.o tests/latency-test_test.o -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I./tests/mlt
 
 
 install:
