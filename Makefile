@@ -7,7 +7,7 @@ deb-deps:
 
 clean:
 	rm -fv src/*~ src/*.o src/*.swp src/latency-test
-	rm -fv tests/*~ tests/*.o tests/*.swp tests/unit-tests
+	rm -fv tests/*~ tests/*.o tests/*.swp tests/*_test
 
 image:
 	docker build -t latency-test:latest .
@@ -20,6 +20,12 @@ latency-test:
 
 latency-test-debug:
 	gcc -DDEBUG=1 -W -g -ggdb -o src/latency-test src/latency-test.c -lrdkafka -lpq -lhiredis -I/usr/include/postgresql/ -I/usr/include/hiredis
+
+test:
+	gcc -DMLT_TESTING=1 -Wall -o src/latency-test.o -c src/latency-test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
+	gcc -DMLT_TESTING=1 -Wall -o tests/latency-test_test.o -c tests/latency-test_test.c -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I/usr/include -I./tests/mlt
+	gcc -DMLT_TESTING=1 -Wall -o tests/latency-test_test src/latency-test.o tests/latency-test_test.o -lrdkafka -lpq -lhiredis -I /usr/include/postgresql/ -I/usr/include/hiredis -I./tests/mlt
+
 
 install:
 	install -m 0755 src/check-latency /usr/local/bin/check-latency

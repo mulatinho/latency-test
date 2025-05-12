@@ -447,6 +447,7 @@ int latency_start_server(void)
 	return 0;
 }
 
+#ifndef MLT_TESTING
 int main(int argc, char **argv)
 {
 	int port = 0, opt = 0;
@@ -471,3 +472,4 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+#endif
