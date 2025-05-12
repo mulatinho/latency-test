@@ -30,7 +30,7 @@ jobs:
 
           docker pull mulatinho/latency-test:$VERSION
           docker run -d --name latency mulatinho/latency-test sleep 5
-          docker cp latency:/app/latency-rest ./latency-test
+          docker cp latency:/app/latency-test ./latency-test
 
           gh release create "$VERSION" --generate-notes './latency-test#Linux 64bit binary'
         env:
