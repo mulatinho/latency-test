@@ -1,4 +1,4 @@
-all: latency-test
+all: latency-test test
 
 #TODO deb:
 

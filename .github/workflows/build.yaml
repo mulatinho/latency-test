@@ -15,8 +15,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker
-      - name: publish in docker hub
+      - name: build
         run: |-
+          docker run -v ./:/app/ mulatinho/build-c:alpine make
+      - name: test
+        run: |-
+          docker run -it -v ./:/app/ mulatinho/build-c:alpine sh -c 'find tests/ -type f -executable | while read test; do ./$test; done'
+      - name: publish
           echo "$TOKEN" | docker login -u mulatinho --password-stdin
           docker build -t mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER .
           docker tag mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER mulatinho/latency-test:latest

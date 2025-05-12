@@ -56,7 +56,7 @@ struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 
 #define mlt_debug(res) \
 	printf("return %s in '%s' on function '%s()' line %d,\ntest '%s'\n", \
-	res ? "success" : "error  ", __FILE__, __func__, __LINE__, __STRING(res))
+	res ? "success" : "error  ", __FILE__, __func__, __LINE__, #res)
 
 #define mlt_time_end() do { \
 	gettimeofday(&mlt_subend_t, NULL); \
