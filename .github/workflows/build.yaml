@@ -20,7 +20,7 @@ jobs:
           docker run -v ./:/app/ mulatinho/build-c:alpine make
       - name: test
         run: |-
-          docker run --rm build -t -v ./:/app/ mulatinho/build-c:alpine sh -c 'find tests/ -type f -executable | while read test; do ./$test; done'
+          docker run -t -v ./:/app/ mulatinho/build-c:alpine sh -c 'find tests/ -type f -executable | while read test; do ./$test; done'
       - name: publish
         run: |-
           echo "$TOKEN" | docker login -u mulatinho --password-stdin
