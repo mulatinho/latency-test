@@ -1,4 +1,4 @@
-/* Copyright (C) 2015 Alexandre Mulatinho <alex at mulatinho.net>.
+/* Copyright (C) 2015 Alexandre Mulatinho <alex@mulatinho.net>.
    mlt.h is a simple group of directives to test source files in C.  
 
    This file is free software; you can redistribute it and/or
@@ -25,6 +25,30 @@
 #define MLT_TESTING 1
 #endif
 
+/* ANSI Color codes */
+#define MLT_COLOR_RED     "\x1b[31m"
+#define MLT_COLOR_GREEN   "\x1b[32m"
+#define MLT_COLOR_YELLOW  "\x1b[33m"
+#define MLT_COLOR_BOLD    "\x1b[1m"
+#define MLT_COLOR_RESET   "\x1b[0m"
+
+/* Test suite support */
+#define MLT_MAX_SUITE_NAME 64
+#define MLT_MAX_SUITES 16
+
+#define BUFFER_INIT(buffer) memset(buffer, '\0', sizeof(buffer))
+
+struct mlt_suite {
+	char name[MLT_MAX_SUITE_NAME];
+	int tests;
+	int success;
+	double time_elapsed;
+};
+
+struct mlt_suite mlt_suites[MLT_MAX_SUITES];
+int mlt_current_suite_idx = -1;
+int mlt_total_suites = 0;
+
 int mlt_rsuccess = 0;
 int mlt_rtests = 0;
 int mlt_result = 0;
@@ -36,40 +60,70 @@ struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 
 #define mlt_start() do { \
 	gettimeofday(&mlt_init_t, NULL); \
-	fprintf(stdout, ":. Started test(s) on '%s' at %s\n", \
-		__FILE__, ctime((const time_t *) &mlt_init_t.tv_sec)); \
+	fprintf(stdout, MLT_COLOR_BOLD ":. Starting test session at %s" MLT_COLOR_RESET, \
+		ctime((const time_t *) &mlt_init_t.tv_sec)); \
 	mlt_rsuccess = 0; mlt_rtests = 0; mlt_result = 0; \
+	mlt_total_suites = 0; mlt_current_suite_idx = -1; \
 	} while(0)
 
 #define mlt_finish() do { \
 	gettimeofday(&mlt_end_t, NULL); \
 	mlt_result = mlt_rtests - mlt_rsuccess; \
+	printf("\n" MLT_COLOR_BOLD "=== Test Session Summary ===" MLT_COLOR_RESET "\n"); \
+	printf("Total time elapsed: %.3fs\n", mlt_time_calc(mlt_end_t, mlt_init_t)); \
+	for (int i = 0; i < mlt_total_suites; i++) { \
+		printf(MLT_COLOR_YELLOW "Suite: %s" MLT_COLOR_RESET "\n", mlt_suites[i].name); \
+		printf("  Tests: %d, " MLT_COLOR_GREEN "Passed: %d" MLT_COLOR_RESET ", " \
+			MLT_COLOR_RED "Failed: %d" MLT_COLOR_RESET " (%.3fs)\n", \
+			mlt_suites[i].tests, mlt_suites[i].success, \
+			(mlt_suites[i].tests - mlt_suites[i].success), \
+			mlt_suites[i].time_elapsed); \
+	} \
+	printf("\n" MLT_COLOR_BOLD "=== Final Results ===" MLT_COLOR_RESET "\n"); \
 	if (!(mlt_result)) \
-		printf("\n:. Result: PASSED, Time Elapsed: %.3fms, Filename: '%s'\n", \
-			mlt_time_calc(mlt_end_t, mlt_init_t), __FILE__); \
-	else printf("\n:. Result: FAILED, Time Elapsed: %.3fms, Filename: '%s'\n", \
-			mlt_time_calc(mlt_end_t, mlt_init_t), __FILE__); \
-	printf(":. Tests run: %d, Tests PASSED: %d, Tests FAILED: %d\n\n", \
+		printf(MLT_COLOR_GREEN "PASSED" MLT_COLOR_RESET ": All tests completed successfully\n"); \
+	else \
+		printf(MLT_COLOR_RED "FAILED" MLT_COLOR_RESET ": Some tests did not pass\n"); \
+	printf("Total Tests: %d, " MLT_COLOR_GREEN "Passed: %d" MLT_COLOR_RESET ", " \
+		MLT_COLOR_RED "Failed: %d" MLT_COLOR_RESET "\n\n", \
 		mlt_rtests, mlt_rsuccess, (mlt_rtests-mlt_rsuccess)); \
 	return mlt_result; \
 	} while(0)
 
-#define mlt_debug(res) \
-	printf("return %s in '%s' on function '%s()' line %d,\ntest '%s'\n", \
-	res ? "success" : "error  ", __FILE__, __func__, __LINE__, #res)
-
-#define mlt_time_end() do { \
-	gettimeofday(&mlt_subend_t, NULL); \
-	printf("  elapsed time in '%s' on function '%s()', time: %.3fms\n", \
-		__FILE__, __func__, mlt_time_calc(mlt_subend_t, mlt_subinit_t)); \
+#define mlt_suite_begin(name) do { \
+	if (mlt_total_suites >= MLT_MAX_SUITES) { \
+		fprintf(stderr, "Error: Maximum number of test suites exceeded\n"); \
+		exit(1); \
+	} \
+	mlt_current_suite_idx = mlt_total_suites++; \
+	mlt_suites[mlt_current_suite_idx].tests = 0; \
+	mlt_suites[mlt_current_suite_idx].success = 0; \
+	gettimeofday(&mlt_subinit_t, NULL); \
+	printf(MLT_COLOR_YELLOW "\n- Running suite: %s" MLT_COLOR_RESET "\n", name); \
 	} while(0)
+
+#define mlt_suite_end() do { \
+	gettimeofday(&mlt_subend_t, NULL); \
+	mlt_suites[mlt_current_suite_idx].time_elapsed = mlt_time_calc(mlt_subend_t, mlt_subinit_t); \
+	} while(0)
+
+#define mlt_debug(res) \
+	printf("  %s %s" MLT_COLOR_RESET " in '%s()' line %d: %s\n", \
+	res ? MLT_COLOR_GREEN "[ OK]" : MLT_COLOR_RED "[ERR]", \
+	res ? "PASS" : "FAIL", \
+	__func__, __LINE__, #res)
 
 #define mlt_assert(test) do { \
-	if (test) { mlt_rsuccess++; } \
-	mlt_rtests++; mlt_debug(test); \
+	if (test) { \
+		mlt_rsuccess++; \
+		mlt_suites[mlt_current_suite_idx].success++; \
+	} \
+	mlt_rtests++; \
+	mlt_suites[mlt_current_suite_idx].tests++; \
+	mlt_debug(test); \
 	} while(0)
 
-#define mlt_time_init() gettimeofday(&mlt_subinit_t, NULL);
+#define mlt_time_init() gettimeofday(&mlt_subinit_t, NULL)
 
-#define mlt_streq(in, str) mlt_assert(strncmp(in, str, strlen(in)) == 0);
-#define mlt_strneq(in, str) mlt_assert(strncmp(in, str, strlen(in)));
+#define mlt_streq(in, str) mlt_assert(strncmp(in, str, strlen(in)) == 0)
+#define mlt_strneq(in, str) mlt_assert(strncmp(in, str, strlen(in)))
