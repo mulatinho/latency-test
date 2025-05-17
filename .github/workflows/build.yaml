@@ -14,10 +14,10 @@ jobs:
 
     container:
       image: mulatinho/build-c:alpine
-      options: >-
-        --volume /__w/${REPO_NAME}/${REPO_NAME}:/app
-        --workdir /app
+      volumes:
+        - /__w/${REPO_NAME}/${REPO_NAME}:/app
 
+    steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
