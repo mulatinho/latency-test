@@ -6,22 +6,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  build:
+    runs-on: [ "ubuntu-latest" ]
+
+    env:
+      REPO_NAME: ${{ github.event.repository.name }}
+
+    container:
+      image: mulatinho/build-c:alpine
+      options: >-
+        --volume /__w/${REPO_NAME}/${REPO_NAME}:/app
+        --workdir /app
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: List contents
+        run: ls -lah /app
+
+      - name: build
+        run: make
+
+      - name: test
+        run: find tests/ -type f -executable | while read test; do ./$test; done
+
   publish:
     runs-on: [ "ubuntu-latest" ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: coursier/cache-action@v6.4
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker
-      - name: build
-        run: |-
-          docker run -v ./:/app/ mulatinho/build-c:alpine make
-      - name: test
-        run: |-
-          docker run -t -v ./:/app/ mulatinho/build-c:alpine sh -c 'find tests/ -type f -executable | while read test; do ./$test; done'
-      - name: publish
+
+      - name: Push to registry
         run: |-
           echo "$TOKEN" | docker login -u mulatinho --password-stdin
           docker build -t mulatinho/latency-test:1.0.$GITHUB_RUN_NUMBER .
