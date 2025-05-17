@@ -12,6 +12,9 @@
 //gint latency_start_server(void);
 //gvoid latency_warn_error_and_quit(void);
 
+
+#define MLT_TESTING 1
+
 void unit_test_get_ip(void)
 {
 	int BATTERY_INPUT = 0, BATTERY_OUTPUT = 1;
