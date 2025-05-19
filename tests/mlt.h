@@ -15,11 +15,13 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-#include <stdio.h>
-#include <string.h>
 #include <assert.h>
-#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
 
 #ifndef MLT_TESTING
 #define MLT_TESTING 1
@@ -36,8 +38,6 @@
 #define MLT_MAX_SUITE_NAME 64
 #define MLT_MAX_SUITES 16
 
-#define BUFFER_INIT(buffer) memset(buffer, '\0', sizeof(buffer))
-
 struct mlt_suite {
 	char name[MLT_MAX_SUITE_NAME];
 	int tests;
@@ -45,15 +45,18 @@ struct mlt_suite {
 	double time_elapsed;
 };
 
-struct mlt_suite mlt_suites[MLT_MAX_SUITES];
-int mlt_current_suite_idx = -1;
-int mlt_total_suites = 0;
+static struct mlt_suite mlt_suites[MLT_MAX_SUITES];
+static int mlt_current_suite_idx = -1;
+static int mlt_total_suites = 0;
 
-int mlt_rsuccess = 0;
-int mlt_rtests = 0;
-int mlt_result = 0;
+static int mlt_rsuccess = 0;
+static int mlt_rtests = 0;
+static int mlt_result = 0;
 
-struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
+static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
+
+#define mlt_debug(...) \
+	fprintf(stderr, __VA_ARGS__);
 
 #define mlt_time_calc(end, ini) \
 	(((end.tv_sec - ini.tv_sec) * 1000000UL + end.tv_usec) - ini.tv_usec) / 1000000.0
@@ -90,16 +93,18 @@ struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	return mlt_result; \
 	} while(0)
 
-#define mlt_suite_begin(name) do { \
+#define mlt_suite_begin(suite_name) do { \
 	if (mlt_total_suites >= MLT_MAX_SUITES) { \
 		fprintf(stderr, "Error: Maximum number of test suites exceeded\n"); \
 		exit(1); \
 	} \
 	mlt_current_suite_idx = mlt_total_suites++; \
+	memset(mlt_suites[mlt_current_suite_idx].name, '\0', MLT_MAX_SUITE_NAME); \
+	snprintf(mlt_suites[mlt_current_suite_idx].name, MLT_MAX_SUITE_NAME - 1, "%s", suite_name); \
 	mlt_suites[mlt_current_suite_idx].tests = 0; \
 	mlt_suites[mlt_current_suite_idx].success = 0; \
 	gettimeofday(&mlt_subinit_t, NULL); \
-	printf(MLT_COLOR_YELLOW "\n- Running suite: %s" MLT_COLOR_RESET "\n", name); \
+	printf(MLT_COLOR_YELLOW "\n- Running suite: %s" MLT_COLOR_RESET "\n", suite_name); \
 	} while(0)
 
 #define mlt_suite_end() do { \
@@ -107,7 +112,7 @@ struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	mlt_suites[mlt_current_suite_idx].time_elapsed = mlt_time_calc(mlt_subend_t, mlt_subinit_t); \
 	} while(0)
 
-#define mlt_debug(res) \
+#define mlt_show_result(res) \
 	printf("  %s %s" MLT_COLOR_RESET " in '%s()' line %d: %s\n", \
 	res ? MLT_COLOR_GREEN "[ OK]" : MLT_COLOR_RED "[ERR]", \
 	res ? "PASS" : "FAIL", \
@@ -120,7 +125,7 @@ struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	} \
 	mlt_rtests++; \
 	mlt_suites[mlt_current_suite_idx].tests++; \
-	mlt_debug(test); \
+	mlt_show_result(test); \
 	} while(0)
 
 #define mlt_time_init() gettimeofday(&mlt_subinit_t, NULL)
