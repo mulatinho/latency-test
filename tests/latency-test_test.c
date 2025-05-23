@@ -21,7 +21,7 @@ void unit_test_get_ip(void)
 	char *battery_test[][NAME_MAX] = {
 		{ "localhost", "127.0.0.1" },
 		{ "127.0.0.1", "127.0.0.1" },
-		{ "dns.google", "8.8.8.8" },
+		{ "lwn.net", "173.255.236.65" },
 	};
 	int battery_size = sizeof(battery_test) / sizeof(battery_test[0]);
 
@@ -36,9 +36,12 @@ void unit_test_get_ip(void)
 
 int main(void)
 {
-    mlt_start();
+	mlt_start();
+	mlt_suite_begin("unittests get_ip");
 
 	unit_test_get_ip();
+    	
+	mlt_suite_end();
 
-    mlt_finish();
+	mlt_finish();
 }

@@ -22,22 +22,25 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <regex.h>
+#include <errno.h>
 
-#ifndef MLT_TESTING
+#ifndef MLT_H
 #define MLT_TESTING 1
-#endif
 
 /* ANSI Color codes */
-#define MLT_COLOR_RED     "\x1b[31m"
-#define MLT_COLOR_GREEN   "\x1b[32m"
-#define MLT_COLOR_YELLOW  "\x1b[33m"
-#define MLT_COLOR_BOLD    "\x1b[1m"
-#define MLT_COLOR_RESET   "\x1b[0m"
+#define M_CLR_RED     "\033[31m"
+#define M_CLR_GREEN   "\033[32m"
+#define M_CLR_YELLOW  "\033[33m"
+#define M_CLR_BOLD    "\033[1m"
+#define M_CLR_RESET   "\033[0m"
 
 /* Test suite support */
 #define MLT_MAX_SUITE_NAME 64
 #define MLT_MAX_SUITES 16
 
+/* Struct where the Suites are defined */
 struct mlt_suite {
 	char name[MLT_MAX_SUITE_NAME];
 	int tests;
@@ -45,6 +48,7 @@ struct mlt_suite {
 	double time_elapsed;
 };
 
+/* Internal global variables */
 static struct mlt_suite mlt_suites[MLT_MAX_SUITES];
 static int mlt_current_suite_idx = -1;
 static int mlt_total_suites = 0;
@@ -53,18 +57,18 @@ static int mlt_rsuccess = 0;
 static int mlt_rtests = 0;
 static int mlt_result = 0;
 
-static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
+static struct timeval mlt_init_t = {0}, mlt_end_t = {0}, mlt_subinit_t = {0}, mlt_subend_t = {0};
 
-#define mlt_debug(...) \
-	fprintf(stderr, __VA_ARGS__);
+#define mlt_debug(...) fprintf(stderr, __VA_ARGS__);
+
+#define mlt_time_init() gettimeofday(&mlt_subinit_t, NULL)
 
 #define mlt_time_calc(end, ini) \
 	(((end.tv_sec - ini.tv_sec) * 1000000UL + end.tv_usec) - ini.tv_usec) / 1000000.0
 
 #define mlt_start() do { \
 	gettimeofday(&mlt_init_t, NULL); \
-	fprintf(stdout, MLT_COLOR_BOLD ":. Starting test session at %s" MLT_COLOR_RESET, \
-		ctime((const time_t *) &mlt_init_t.tv_sec)); \
+	fprintf(stdout, M_CLR_BOLD ":. Starting MLT Test Session\n" M_CLR_RESET); \
 	mlt_rsuccess = 0; mlt_rtests = 0; mlt_result = 0; \
 	mlt_total_suites = 0; mlt_current_suite_idx = -1; \
 	} while(0)
@@ -72,23 +76,23 @@ static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 #define mlt_finish() do { \
 	gettimeofday(&mlt_end_t, NULL); \
 	mlt_result = mlt_rtests - mlt_rsuccess; \
-	printf("\n" MLT_COLOR_BOLD "=== Test Session Summary ===" MLT_COLOR_RESET "\n"); \
+	printf("\n" M_CLR_BOLD "=== Test Session Summary ===" M_CLR_RESET "\n"); \
 	printf("Total time elapsed: %.3fs\n", mlt_time_calc(mlt_end_t, mlt_init_t)); \
 	for (int i = 0; i < mlt_total_suites; i++) { \
-		printf(MLT_COLOR_YELLOW "Suite: %s" MLT_COLOR_RESET "\n", mlt_suites[i].name); \
-		printf("  Tests: %d, " MLT_COLOR_GREEN "Passed: %d" MLT_COLOR_RESET ", " \
-			MLT_COLOR_RED "Failed: %d" MLT_COLOR_RESET " (%.3fs)\n", \
+		printf(M_CLR_YELLOW "Suite: %s" M_CLR_RESET "\n", mlt_suites[i].name); \
+		printf("  Tests: %d, " M_CLR_GREEN "Passed: %d" M_CLR_RESET ", " \
+			M_CLR_RED "Failed: %d" M_CLR_RESET " (%.3fs)\n", \
 			mlt_suites[i].tests, mlt_suites[i].success, \
 			(mlt_suites[i].tests - mlt_suites[i].success), \
 			mlt_suites[i].time_elapsed); \
 	} \
-	printf("\n" MLT_COLOR_BOLD "=== Final Results ===" MLT_COLOR_RESET "\n"); \
+	printf("\n" M_CLR_BOLD "=== Final Results ===" M_CLR_RESET "\n"); \
 	if (!(mlt_result)) \
-		printf(MLT_COLOR_GREEN "PASSED" MLT_COLOR_RESET ": All tests completed successfully\n"); \
+		printf(M_CLR_GREEN "PASSED" M_CLR_RESET ": All tests completed successfully\n"); \
 	else \
-		printf(MLT_COLOR_RED "FAILED" MLT_COLOR_RESET ": Some tests did not pass\n"); \
-	printf("Total Tests: %d, " MLT_COLOR_GREEN "Passed: %d" MLT_COLOR_RESET ", " \
-		MLT_COLOR_RED "Failed: %d" MLT_COLOR_RESET "\n\n", \
+		printf(M_CLR_RED "FAILED" M_CLR_RESET ": Some tests did not pass\n"); \
+	printf("Total Tests: %d, " M_CLR_GREEN "Passed: %d" M_CLR_RESET ", " \
+		M_CLR_RED "Failed: %d" M_CLR_RESET "\n\n", \
 		mlt_rtests, mlt_rsuccess, (mlt_rtests-mlt_rsuccess)); \
 	return mlt_result; \
 	} while(0)
@@ -104,7 +108,7 @@ static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	mlt_suites[mlt_current_suite_idx].tests = 0; \
 	mlt_suites[mlt_current_suite_idx].success = 0; \
 	gettimeofday(&mlt_subinit_t, NULL); \
-	printf(MLT_COLOR_YELLOW "\n- Running suite: %s" MLT_COLOR_RESET "\n", suite_name); \
+	printf(M_CLR_YELLOW "\n- Running suite: %s" M_CLR_RESET "\n", suite_name); \
 	} while(0)
 
 #define mlt_suite_end() do { \
@@ -113,11 +117,12 @@ static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	} while(0)
 
 #define mlt_show_result(res) \
-	printf("  %s %s" MLT_COLOR_RESET " in '%s()' line %d: %s\n", \
-	res ? MLT_COLOR_GREEN "[ OK]" : MLT_COLOR_RED "[ERR]", \
+	printf("  %s %s" M_CLR_RESET " in '%s()' line %d: %s\n", \
+	res ? M_CLR_GREEN "[ OK]" : M_CLR_RED "[ERR]", \
 	res ? "PASS" : "FAIL", \
 	__func__, __LINE__, #res)
 
+/* Common Utilities */
 #define mlt_assert(test) do { \
 	if (test) { \
 		mlt_rsuccess++; \
@@ -128,7 +133,64 @@ static struct timeval mlt_init_t, mlt_subinit_t, mlt_end_t, mlt_subend_t;
 	mlt_show_result(test); \
 	} while(0)
 
-#define mlt_time_init() gettimeofday(&mlt_subinit_t, NULL)
-
 #define mlt_streq(in, str) mlt_assert(strncmp(in, str, strlen(in)) == 0)
+
 #define mlt_strneq(in, str) mlt_assert(strncmp(in, str, strlen(in)))
+
+/* String Utilities */
+#define mlt_strupper(str) do { \
+    for (char *p = (str); *p; ++p) *p = toupper(*p); \
+} while (0)
+
+#define mlt_strlower(str) do { \
+    for (char *p = (str); *p; ++p) *p = tolower(*p); \
+} while (0)
+
+#define mlt_strcontains(str, substr) (strstr((str), (substr)) != NULL ? 1 : 0)
+
+#define mlt_strpaste(a, b) a ## b
+
+#define mlt_stringify(a) #a
+
+/* Array uttlities */
+#define mlt_arr_len(arr) (sizeof(arr)/sizeof((arr)[0]))
+
+#define mlt_print_int_arr(arr, n) for (size_t i = 0; i < n; i++) printf("%d ", arr[i])
+
+#define mlt_print_float_arr(arr, n) for (size_t i = 0; i < n; i++) printf("%.2f ", arr[i])
+
+#define mlt_print_double_arr(arr, n) for (size_t i = 0; i < n; i++) printf("%.2f ", arr[i])
+
+#define mlt_print_str_arr(arr, n) for (size_t i = 0; i < n; i++) printf("%s\n", arr[i])
+
+/* Sort Utilities */
+#define mlt_define_comparision(type, name, expr) \
+    int mlt_name(const void *a, const void *b) { \
+        type mlt__a = *(const type *)a, _b = *(const type *)b; \
+        return mlt_(expr); \
+    }
+    
+#define mlt_define_compare_str(name) \
+    int mlt_name(const void *a, const void *b) { \
+        return mlt_strcmp(*(const char **)a, *(const char **)b); \
+    }
+
+#define mlt_define_compare_struct(type, field, name) \
+    int mlt_name(const void *a, const void *b) { \
+        return mlt_((const type *)a)->field - ((const type *)b)->field; \
+    }
+
+/* Regex Utilities */
+#define mlt_regex_compile(pattern, regex_ptr) \
+    regcomp(regex_ptr, pattern, REG_EXTENDED)
+
+#define mlt_regex_exec(regex_ptr, text) \
+    regexec(regex_ptr, text, 0, NULL, 0)
+
+#define mlt_regex_exec_match(regex_ptr, text, nmatch, pmatch) \
+    regexec(regex_ptr, text, nmatch, pmatch, 0)
+
+#define mlt_regex_free(regex_ptr) \
+    regfree(regex_ptr)
+
+#endif
